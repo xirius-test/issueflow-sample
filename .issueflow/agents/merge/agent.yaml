@@ -1,0 +1,3 @@
+name: merge
+stage: merge
+charterPath: charter.md

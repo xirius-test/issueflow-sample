@@ -1,0 +1,11 @@
+name: model-currency-check
+stage: model-currency-check
+description: Weekly, for every curated agentic framework the catalog holds — visits its declared vendor model source and reports new, current, superseded or retired models, or 'unchecked' with a reason when it cannot.
+# A built-in scheduled agent (scheduledAgents.model-currency-check):
+# it runs on the solution's clock, not on an issue, and reads this install's
+# curated framework catalog through the engine's own read tool — never a
+# second, hand-maintained list of frameworks.
+scope: solution
+workspace: solution-repos
+charterPath: charter.md
+permissionsPath: permissions.yaml

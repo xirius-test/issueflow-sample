@@ -1,0 +1,11 @@
+# Rendered from an IssueFlow workflow template. This repository's
+# files are now the source of truth — edit them, or use the portal's
+# config editor; the template was only a starting point.
+repo: xirius-test/issueflow-sample
+name: IssueFlow sample
+defaultBranch: main
+primaryLanguage: Not yet declared — fill in per repo.
+description: IssueFlow sample (rendered from an IssueFlow workflow template).
+guides:
+  codingStandards: docs/reference/coding-standards.md
+  architectureGuidelines: docs/reference/architecture-guidelines.md

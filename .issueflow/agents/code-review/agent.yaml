@@ -1,0 +1,4 @@
+name: code-review
+stage: code-review
+charterPath: charter.md
+permissionsPath: permissions.yaml

@@ -1,0 +1,4 @@
+name: discard
+stage: discard
+charterPath: charter.md
+permissionsPath: permissions.yaml

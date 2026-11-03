@@ -1,0 +1,5 @@
+name: pull-request
+stage: pull-request
+persona: barnabas
+description: Merges the workflow's target branch into the run branch, pushes it, and opens or reuses the run's pull request, via the SCM tool.
+charterPath: charter.md

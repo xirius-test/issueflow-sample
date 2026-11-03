@@ -1,0 +1,7 @@
+allowedTools:
+  - read-files
+  - edit-files
+  - run-project-commands
+  - git-read
+  - github-read
+  - issueflow-reporting

@@ -1,0 +1,5 @@
+name: ci-verification
+stage: ci-verification
+persona: caleb
+description: Waits for the pull request's required checks on its current head and reports why they are not green, via the SCM tool.
+charterPath: charter.md

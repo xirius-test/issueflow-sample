@@ -1,0 +1,6 @@
+name: resolve-conflicts
+stage: resolve-conflicts
+persona: hiram
+description: Resolves a merge conflict between a finished change and its target branch, preserving both sides' intent.
+charterPath: charter.md
+permissionsPath: permissions.yaml

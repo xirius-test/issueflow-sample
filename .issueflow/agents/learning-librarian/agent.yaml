@@ -1,0 +1,10 @@
+name: learning-librarian
+stage: learning-librarian
+description: Keeps each repository's learnings as a few small topics — links each proposal to the rule it supports, rejects what the guides already say, and submits topic and rule changes that a person approves when the approval level asks.
+# A built-in scheduled agent (scheduledAgents.learning-librarian): it runs on
+# the solution's clock, not on an issue, and reads every repository of the
+# solution for the guides and charters a proposal may already be covered by.
+scope: solution
+workspace: solution-repos
+charterPath: charter.md
+permissionsPath: permissions.yaml

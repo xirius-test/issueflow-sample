@@ -1,0 +1,253 @@
+# "single-minimal" per-issue workflow — uses the shared delivery chain.
+#
+# Quick-start shape: every issue enters straight at `implementation` — no
+# triage stage, no human gate. The shared delivery chain (`pull-request` ->
+# `ci-verification` -> `merge`) follows every change; `code-review` is the
+# one review checkpoint between a fresh issue and a merged change.
+
+id: issueflow-sample
+
+stages:
+
+  implementation:
+    persona: joshua
+    framework: active
+    requiresHumanAsk: true
+    entryWhen: default
+    # This stage's PASSED attempt IS the delivered code/config
+    # change, for the cost-split/automation-overhead-multiple query.
+    producesChange: true
+    contextGuidance: |
+      ## Implementation
+
+      Read the issue, implement the change end-to-end (code + tests), and
+      commit it to this run's branch. Follow
+      `docs/reference/coding-standards.md` if it exists and has content;
+      otherwise apply general best practice for this repository's language
+      and stack. The `pull-request` stage that follows opens the pull
+      request from your commits — never open, merge or close one yourself.
+      If the issue is already fully satisfied by separately merged work, report
+      `outcome: not-needed, reason: already-done` (never bare `passed`,
+      never suspend) — that terminates RESOLVED instead of reworking.
+
+      ## Owner decisions — what you build to
+
+      The requirements are the issue's original description **plus every decision the owner has recorded since** (a human gate's FAIL or NOT_NEEDED comment, a scope update, an answered question), applied on top in the order they were made. Where two overlap, the newest wins; every part no decision touched still holds. Example: the description asks for "three red boxes and a yellow circle" and a FAIL says "make the boxes blue" — the requirement is now three blue boxes **and** the yellow circle.
+      - If this stage was re-entered on a failed route, open your result by listing each change the failing verdict requested and what you did about each: applied, or not applied and why.
+      - Never write that the owner approved something unless a PASS from the owner is recorded for it. A gate that failed, or that you have not seen pass, approved nothing.
+    routes:
+      passed: pull-request
+      failed:
+        default: implementation
+      # Already delivered — an honest NOT_NEEDED instead of
+      # looping. `discard` disposes of any work product and terminates
+      # RESOLVED.
+      not-needed:
+        default: discard
+        reasons:
+          already-done: discard
+
+  # A script step, not an agent: merges the latest target branch into the run
+  # branch, pushes it, and opens the pull request (or reuses the open one),
+  # via the SCM tool. GitHub's own CI starts on the pushed head right away.
+  pull-request:
+    agent: pull-request
+    framework: scm-merge
+    # A fetch, a merge, a push and at most one GitHub write: seconds. Bound so
+    # a hung git is killed rather than riding the worker's own default.
+    maxExecutionTime: 600
+    action: {operation: open-pr}
+    routes:
+      passed: code-review
+      failed:
+        default: escalate
+        reasons:
+          merge-conflict: resolve-conflicts
+          scm-transient:
+            target: pull-request
+            retry: {wait: 5m, attempts: 3, then: escalate}
+          nothing-published: implementation
+          branch-drift: implementation
+      not-needed:
+        default: escalate
+
+  code-review:
+    persona: nathan
+    framework: active
+    requiresHumanAsk: true
+    agent: code-review
+    # This template's ONLY review between a fresh issue and a merged
+    # change, so its PASSED verdict must be GROUNDED to the change under
+    # review — the engine checks the agent's declared `reviewed_paths`
+    # against the worker's own `git diff --name-only base...working`
+    # manifest and refuses a PASS that names nothing, names unrelated files,
+    # or lands on an empty diff. The charter (agents/code-review/charter.md)
+    # carries the other half: it tells the reviewer it MUST set
+    # `reviewed_paths`. Declaring this without that instruction turns every
+    # honest PASS into a refused completion, so the two move together.
+    requiresDiffAnchor: true
+    routes:
+      passed: ci-verification
+      failed: implementation-rework
+      # `NOT_NEEDED` means THE WHOLE ISSUE should not be
+      # implemented, never "this one stage had nothing to do", so it always
+      # terminates the issue. The change under review is written but not
+      # merged, so `discard` disposes of it and terminates RESOLVED.
+      not-needed:
+        default: discard
+
+  # Owner ruling: a review that rejects the change is reworked at a higher
+  # rank than a fresh attempt — dearer per attempt, cheaper than another round
+  # trip. Same agent and job as `implementation`; the difference is that this
+  # one answers a rejection finding by finding (fix it, or dispute it with
+  # evidence) instead of building from a blank slate.
+  implementation-rework:
+    agent: implementation
+    framework: active
+    requiresHumanAsk: true
+    complexity: "9"
+    persona: benaiah
+    interactive: true
+    maxExecutionTime: 5400
+    producesChange: true
+    contextGuidance: |
+      ## Implementation rework
+
+      Answer the rejection, finding by finding: fix it, or dispute it with
+      evidence (the file and line, the command you ran and its output —
+      never a bare opinion). Do not re-open ground the review already
+      settled, and do not touch work that already passed unless the
+      evidence directly implicates it.
+
+      ## Owner decisions — what you build to
+
+      The requirements are the issue's original description **plus every decision the owner has recorded since** (a human gate's FAIL or NOT_NEEDED comment, a scope update, an answered question), applied on top in the order they were made. Where two overlap, the newest wins; every part no decision touched still holds. Example: the description asks for "three red boxes and a yellow circle" and a FAIL says "make the boxes blue" — the requirement is now three blue boxes **and** the yellow circle.
+      - Open your result by listing each change the failing verdict requested and what you did about each: applied, or not applied and why.
+      - Never write that the owner approved something unless a PASS from the owner is recorded for it. A gate that failed, or that you have not seen pass, approved nothing.
+    routes:
+      # The change goes back through `pull-request`, which merges the target
+      # again and pushes the fix, so CI runs on the resolved head.
+      passed: pull-request
+      failed:
+        default: implementation-rework
+      not-needed:
+        default: discard
+
+  # A script step, not an agent: waits for the pull request's required checks
+  # on its current head and reports why they are not green, via the SCM tool.
+  ci-verification:
+    agent: ci-verification
+    framework: scm-merge
+    # Raise this (and the maxExecutionTime margin below) if this
+    # repository's own CI regularly runs longer than 45 minutes.
+    action: {operation: verify-checks, maxWait: 45m}
+    maxExecutionTime: 3000
+    routes:
+      passed: merge
+      failed:
+        default: escalate
+        reasons:
+          ci-red: implementation-rework
+          ci-infra: escalate
+          ci-not-reported: escalate
+          merge-conflict: resolve-conflicts
+          scm-transient:
+            target: ci-verification
+            retry: {wait: 5m, attempts: 3, then: escalate}
+          watch-timeout:
+            target: ci-verification
+            retry: {attempts: 2, then: escalate}
+          nothing-published: pull-request
+          branch-drift: implementation
+      not-needed:
+        default: escalate
+
+  merge:
+    persona: ruth
+    agent: merge
+    # This stage runs the deterministic merge TOOL, not an
+    # agent. That is a property of the framework it dispatches to (a
+    # `kind: process` workstation framework), never of the agent folder —
+    # `agent.yaml` carries no `kind:`. Name the process framework your
+    # workstation.yaml declares here.
+    framework: scm-merge
+    # Owner ruling: one merge at a time per (repo, target branch) — a merge
+    # queue so concurrent merges never knock each other behind and restart a
+    # CI run that was already in flight.
+    concurrency:
+      max: 1
+      scope: target-branch
+    # Must exceed (1 + re-arms) x mergeChecksTimeoutSeconds: 2 x 600 = 1200s.
+    maxExecutionTime: 1500
+    routes:
+      passed: done
+      failed:
+        default: implementation-rework
+        reasons:
+          merge-conflict: resolve-conflicts
+          ci-red: implementation-rework
+          # A required check that never ran at all (a billing lock, a runner
+          # outage, a required context that never reported) is not a code
+          # failure; a person may need to act.
+          checks-not-run: escalate
+          # Owner ruling: a PR that is merely behind its base, or whose
+          # checks did not finish inside the wait, is not broken code. It
+          # retries the merge itself and never replays implementation and
+          # the review chain.
+          checks-timeout: merge
+          # A required check's CI job died initializing its containers (a
+          # container-registry refusal or outage) and failed the same way
+          # after the merge tool re-ran it once. Not a code failure either.
+          checks-infra-fault: merge
+          merge-blocked: merge
+          # GitHub itself said the PR was mergeable; the merge command just
+          # failed transiently. Retry the merge, not the code.
+          merge-transient: merge
+          branch-drift: implementation
+          nothing-published: pull-request
+      # Implementation, review, the pull request and CI have all
+      # already run, so this verdict arriving HERE means the change is
+      # MISSING rather than unnecessary — a fault, not a conclusion.
+      not-needed:
+        default: escalate
+
+  # Owner ruling: resolves a merge conflict between a finished change and its
+  # moved target branch, preserving both sides' intent. The pull request's
+  # required checks are the test gate for the resolution; a conflict that is
+  # not mechanical fails to `implementation`.
+  resolve-conflicts:
+    agent: resolve-conflicts
+    framework: active
+    requiresHumanAsk: true
+    complexity: complexity
+    maxExecutionTime: 3600
+    routes:
+      # Always returns to `pull-request`, from wherever the conflict was met,
+      # so CI runs on the resolved head.
+      passed: pull-request
+      failed:
+        default: implementation
+      not-needed:
+        default: discard
+
+  # Disposal: handles NOT_NEEDED and FAILED completions that will
+  # never merge — closes any open PR for this run's branch and leaves the
+  # repo tidy. NOT branch/worktree teardown (the worker + engine own that on
+  # any terminal). Reports the SAME outcome kind that routed it here so the
+  # Run's classified disposition stays honest (RESOLVED vs REJECTED).
+  # Charter: .issueflow/agents/discard/.
+  discard:
+    agent: discard
+    framework: active
+    requiresHumanAsk: true
+    persona: jeremiah
+    routes:
+      # Every outcome this stage can report terminates at `done` — a
+      # completed disposal has nothing downstream. Without `passed:` a discard
+      # agent that did its work and reported success had no edge at all.
+      passed:
+        default: done
+      not-needed:
+        default: done
+      failed:
+        default: done

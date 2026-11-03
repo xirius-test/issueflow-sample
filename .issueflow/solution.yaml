@@ -1,0 +1,93 @@
+# "single-minimal" solution-level config.
+#
+# Minimal reason vocabularies, one per reason-bearing outcome, so
+# `not-needed.reasons.already-done` on implementation is
+# load-legal. `id`/`slug`/`name` are placeholders the rendering step
+# overwrites with the real solution slug.
+
+id: issueflow-sample
+slug: issueflow-sample
+name: IssueFlow sample
+
+# dimensions: (unified dimensions resolver) — declared explicitly because the
+# deployment add-on's validator refuses a solution with no `dimensions:`
+# block at all. `issue-type` and `lane` are label-sourced; `priority` orders
+# dispatch below.
+dimensions:
+  issue-type:
+    prefix: ""
+    values: [bug, enhancement, feature, chore, epic]
+    default: bug
+  lane:
+    prefix: "lane:"
+    values: [dev, production]
+    default: dev
+  priority:
+    prefix: "priority:"
+    values: [urgent, high, normal, low]
+    default: normal
+
+# dispatchPriority: this solution's precedence on the shared 0-9 scale.
+# Priority first, then work already started, then closeness to done; the
+# oldest issue breaks any remaining tie. An issue with no priority label is
+# scored by the priority dimension's own default (normal -> 5).
+dispatchPriority:
+  - dimension: priority
+    values: {urgent: 9, high: 7, normal: 5, low: 3}
+  - signal: inFlight
+  - signal: progress
+
+failReasons:
+  default: unspecified
+  reasons:
+    unspecified: "Stage failed without a declared reason."
+    # The `scm-merge` tool's own words. The tool
+    # reports one of these whenever a merge does not happen, and the engine
+    # refuses a reason this vocabulary does not declare, so a solution that
+    # merges with the tool must declare all of them. Where each one GOES is
+    # this solution's `merge` stage routing, never the tool's.
+    merge-conflict: "The run branch's PR does not merge cleanly (a real conflict)."
+    ci-red: "The run branch's PR is blocked by a failing/required status check."
+    checks-timeout: "A required status check did not complete within the configured wait time."
+    checks-not-run: "A required status check never ran — its newest run was never started (an account billing lock, a runner outage) or was cancelled with nothing replacing it, or a required context never reported. Not a code failure: someone has to clear the cause and re-run the checks."
+    # A required check's CI job died initializing its containers (a
+    # container-registry refusal or outage) and failed the same way after the
+    # merge tool re-ran it once. Not a code failure: the merge stage is
+    # retried, re-running the job again.
+    checks-infra-fault: "A required check's CI job died initialising its containers (a container-registry refusal or outage) and failed the same way after the merge tool re-ran it. Not a code failure: the merge stage is retried, re-running the job again."
+    ci-infra: "A required check failed on the CI runner, not the code (cancelled, timed out, never started, or died in a setup step) and failed the same way after the SCM tool re-ran it once, or could not be re-run. No commit changes it; a person looks."
+    ci-not-reported: "A required check never reported on the pull request's head within the SCM tool's wait (a workflow that did not trigger, or a misnamed required context). No commit changes it; a person looks."
+    merge-blocked: "The run branch's PR cannot be merged due to a block other than checks (missing required review, branch protection rule, admin lock)."
+    merge-transient: "The PR was mergeable with its checks cleared, but the merge command itself failed transiently (network or API); the merge is retried."
+    branch-drift: "The run branch's PR was closed/abandoned — it fell out of the mergeable path."
+    nothing-published: "No PR exists for the run branch and none could be opened — nothing was published to merge."
+    # The same tool's action modes (`run-action`, `watch-action`).
+    # Each says only what happened; where
+    # it goes is the routing of the stage that runs the mode. The wait has
+    # two separately-bounded phases: watch-timeout means the run left the
+    # queue but then ran too long; watch-queued-timeout means it never left
+    # the queue in time.
+    watch-timeout: "The action watch's run left the queue, but then ran too long — its own maximum running time ran out while the run was still going."
+    watch-queued-timeout: "The action watch's run never left the queue — its own maximum queued-time budget ran out while the run was still queued."
+    scm-transient: "GitHub kept answering with errors (bad gateway, rate limit, network) after the SCM tool's own retries."
+    action-refused: "GitHub refused to start or re-run the action (no workflow_dispatch trigger, a bad input, no permission), or there was no run to re-run."
+    not-supported: "This repository does not implement the action for the run's target branch."
+
+# passedReasons: the PASSED outcome's own words.
+# `action-failed` is the SCM tool's `watch-action` (and `run-action` with
+# `wait: true`) saying the watch finished and the merge did NOT succeed — a
+# red run, no run, or the merge missing from the branch — with the evidence
+# for the stage that judges it. The watch did its job, so it is a PASSED word.
+passedReasons:
+  reasons:
+    action-failed: "The action's run was watched to the end and the merge did not succeed: the latest run covering it is red, no run covers it, or the branch does not contain it. The evidence names which, with the failing jobs, log tails and the batch the run deployed."
+
+# notNeededReasons: the NOT_NEEDED outcome's OWN words — keeping
+# `already-done` out of `failReasons:` is what stops the two vocabularies
+# being cited across outcomes, and `not-required` gives a reasonless
+# NOT_NEEDED a default that does not assert the stage failed.
+notNeededReasons:
+  default: not-required
+  reasons:
+    not-required: "The stage determined this issue's work is not required, without naming a more specific reason below."
+    already-done: "The issue is already fully satisfied by code that merged separately (a dependency's fix covers it); no material change remains here."

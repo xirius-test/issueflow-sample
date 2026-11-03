@@ -1,0 +1,19 @@
+# Read the solution's repositories, and curate through the engine. The
+# operator MCP server carries the librarian's learning tools
+# (operator_learning_vocabulary, operator_list_learning_proposals,
+# operator_list_learning_topics, operator_list_learning_changes,
+# operator_submit_learning_change, operator_retry_learning_change,
+# operator_withdraw_learning_change, operator_curate_learning_proposal,
+# operator_retire_learning_rule, operator_retire_learning_topic,
+# operator_nominate_learning_topic). The librarian links or rejects a pending
+# proposal, submits changes to topics and rules, and retires rules and topics on
+# its own authority, logged in the digest; approving or declining a change,
+# acknowledging a Revised mark and restoring are a person's actions and are not
+# reachable from here at all.
+allowedTools:
+  - issueflow-operator
+  - read-files
+
+# MCP servers to attach — parsed from THIS `mcp:` key, not from allowedTools.
+mcp:
+  - issueflow-operator

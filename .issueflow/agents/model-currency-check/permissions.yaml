@@ -1,0 +1,20 @@
+# Discovers what to check through the engine's own read tool
+# (operator_model_currency_check_targets) — never a second,
+# hand-maintained list of frameworks or models. Visits each framework's
+# declared vendor source (an "api" endpoint or a rendered "page") with
+# whatever browsing/fetch capability the framework itself provides — that
+# is not an IssueFlow grant, since it never touches the solution's own
+# repositories or the engine's write surface.
+#
+# When an "api" source needs a credential, read-files lets the agent read
+# it from this machine's secrets.env, beside the resolved workstation
+# config — never a raw environment variable (CLAUDE.md "Secrets"), and
+# never required: a vendor's credential is optional, and its absence is a
+# reason for 'unchecked', never a reason to invent one.
+allowedTools:
+  - issueflow-operator
+  - read-files
+
+# MCP servers to attach — parsed from THIS `mcp:` key, not from allowedTools.
+mcp:
+  - issueflow-operator
